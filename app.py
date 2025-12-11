@@ -43,7 +43,7 @@ def extract_features(audio_path, max_pad_len=174):
         return None
 
 # Recording parameters
-duration = 1  # seconds
+duration = 3  # seconds
 sample_rate = 22050
 
 col1, col2 = st.columns(2)
@@ -54,47 +54,48 @@ with col1:
             st.error("⚠️ Model not found! Please train the model first by running train_model.py")
         else:
             with st.spinner("Recording..."):
-                # Record audio
                 recording = sd.rec(int(duration * sample_rate), 
-                                 samplerate=sample_rate, 
-                                 channels=1)
+                                   samplerate=sample_rate, 
+                                   channels=1)
                 sd.wait()
-                
-                # Save to temporary file
+
+                # Save audio to a temporary WAV file
                 temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-                write(temp_file.name, sample_rate, recording)
-                
-                # Display audio player
-                st.audio(temp_file.name)
-                
+                temp_file_path = temp_file.name
+                temp_file.close()  # important: close before writing
+
+                write(temp_file_path, sample_rate, recording)
+
+                st.audio(temp_file_path)
+
                 # Extract features and predict
-                features = extract_features(temp_file.name)
-                
+                features = extract_features(temp_file_path)
+
                 if features is not None:
-                    # Reshape for model input
                     features = features.reshape(1, features.shape[0], features.shape[1], 1)
-                    
-                    # Make prediction
                     prediction = model.predict(features, verbose=0)
                     predicted_class = np.argmax(prediction, axis=1)
                     predicted_word = label_encoder.inverse_transform(predicted_class)[0]
                     confidence = np.max(prediction) * 100
-                    
-                    # Display results
+
                     st.success(f"### Predicted Word: **{predicted_word.upper()}**")
                     st.info(f"Confidence: {confidence:.2f}%")
-                    
-                    # Show all probabilities
+
+                    # All probabilities
                     st.write("#### All Predictions:")
                     all_words = label_encoder.classes_
                     probs = prediction[0]
                     results = sorted(zip(all_words, probs), key=lambda x: x[1], reverse=True)
-                    
+
                     for word, prob in results:
                         st.write(f"- {word}: {prob*100:.2f}%")
-                
-                # Clean up temp file
-                os.unlink(temp_file.name)
+
+                # Safe cleanup attempt
+                try:
+                    os.remove(temp_file_path)
+                except PermissionError:
+                    pass  # Windows still using the file, safe to ignore
+
 
 with col2:
     uploaded_file = st.file_uploader("Or upload an audio file", type=['wav'])
@@ -104,42 +105,40 @@ with col2:
         else:
             # Save uploaded file temporarily
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+            temp_file_path = temp_file.name
             temp_file.write(uploaded_file.read())
             temp_file.close()
-            
-            # Display audio player
-            st.audio(temp_file.name)
-            
-            # Extract features and predict
-            features = extract_features(temp_file.name)
-            
+
+            st.audio(temp_file_path)
+
+            features = extract_features(temp_file_path)
+
             if features is not None:
-                # Reshape for model input
                 features = features.reshape(1, features.shape[0], features.shape[1], 1)
-                
-                # Make prediction
                 prediction = model.predict(features, verbose=0)
                 predicted_class = np.argmax(prediction, axis=1)
                 predicted_word = label_encoder.inverse_transform(predicted_class)[0]
                 confidence = np.max(prediction) * 100
-                
-                # Display results
+
                 st.success(f"### Predicted Word: **{predicted_word.upper()}**")
                 st.info(f"Confidence: {confidence:.2f}%")
-                
-                # Show all probabilities
+
                 st.write("#### All Predictions:")
                 all_words = label_encoder.classes_
                 probs = prediction[0]
                 results = sorted(zip(all_words, probs), key=lambda x: x[1], reverse=True)
-                
+
                 for word, prob in results:
                     st.write(f"- {word}: {prob*100:.2f}%")
-            
-            # Clean up temp file
-            os.unlink(temp_file.name)
+
+            # Safe cleanup
+            try:
+                os.remove(temp_file_path)
+            except PermissionError:
+                pass
+
 
 st.markdown("---")
 st.write("### About")
-st.write("This app uses a Convolutional Neural Network (CNN) trained on audio data to recognize spoken words.")
-st.write("The model extracts MFCC (Mel-frequency cepstral coefficients) features from your audio and classifies the word.")
+st.write("This app uses a CNN trained on audio data to recognize spoken words.")
+st.write("The model extracts MFCC features from your audio and classifies the word.")
