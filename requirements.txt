@@ -1,6 +1,7 @@
 streamlit
 numpy
 librosa
+resampy
 scikit-learn
 tensorflow
 sounddevice
