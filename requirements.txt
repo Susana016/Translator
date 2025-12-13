@@ -4,5 +4,4 @@ librosa
 resampy
 scikit-learn
 tensorflow
-sounddevice
 scipy
